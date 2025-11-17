@@ -1,6 +1,6 @@
 # Vastcat
 
-Vastcat is a cat-themed (but not furry) deployment wizard for launching [hashcat](https://hashcat.net/hashcat/) workloads on [Vast.ai](https://vast.ai/). It automates wordlist/ruleset collection, instance provisioning, and job orchestration with optional Discord notifications.
+Vastcat is a cat-themed (:3) deployment wizard for launching [hashcat](https://hashcat.net/hashcat/) workloads on [Vast.ai](https://vast.ai/). It automates wordlist/ruleset collection, instance provisioning, and job orchestration with optional Discord notifications.
 
 ## Features
 - Fetches popular wordlists and rules: RockYou, WeakPass, Seclists, Dive, Kaonashi, OneRuleToRuleThemAll, and more.
