@@ -41,7 +41,7 @@ class Wizard:
         if sync_targets:
             self.console.print(cat_say("Fetching requested assets..."))
             self.asset_manager.sync(sync_targets)
-        wordlist_keys = self._pick_assets("wordlists", default=["rockyou", "weakpass_3"])
+        wordlist_keys = self._pick_assets("wordlists")
         rule_keys = self._pick_assets("rules")
         # ensure selected assets exist
         self.asset_manager.sync(wordlist_keys + rule_keys)
@@ -93,7 +93,7 @@ class Wizard:
             choices=choices,
         ).ask()
 
-    def _pick_assets(self, category: str, default: Optional[List[str]] = None) -> List[str]:
+    def _pick_assets(self, category: str) -> List[str]:
         keys = list_assets(category)
         if not keys:
             return []
@@ -104,7 +104,8 @@ class Wizard:
             instruction="space to toggle",
         ).ask()
         if not selected:
-            return default or []
+            self.console.print(cat_say(f"No {category} selected; skipping {category} sync."))
+            return []
         return selected
 
     def _prompt_api_key(self) -> str:
