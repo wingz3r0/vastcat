@@ -42,7 +42,6 @@ class Wizard:
         wordlist_keys = self._pick_assets("wordlists")
         if not wordlist_keys:
             self.console.print(cat_say("No wordlists selected. Hashcat requires at least one wordlist."))
-            self.console.print(cat_say("Remember: Use SPACE to toggle selection, then ENTER to confirm."))
             if questionary.confirm("Try again?", default=True).ask():
                 wordlist_keys = self._pick_assets("wordlists")
             if not wordlist_keys:
@@ -133,22 +132,89 @@ class Wizard:
                 self.console.print(cat_say("Make sure hashcat binary has execute permissions."))
 
     def _pick_assets(self, category: str) -> List[str]:
+        """Pick assets using a numbered menu (more reliable than arrow keys)."""
         keys = list_assets(category)
         if not keys:
             return []
-        choices = [Choice(title=f"{key}: {ASSET_LIBRARY[key].description}", value=key) for key in keys]
+
+        # Display available options
         self.console.print(f"\n[bold]Available {category}:[/bold]")
-        self.console.print("[dim]Use arrow keys to navigate, SPACE to select/deselect, ENTER when done[/dim]\n")
-        selected = questionary.checkbox(
-            f"Select {category} for hashcat:",
-            choices=choices,
+        for idx, key in enumerate(keys, 1):
+            asset = ASSET_LIBRARY[key]
+            self.console.print(f"  [cyan]{idx}[/cyan]. {key}: [dim]{asset.description}[/dim]")
+
+        # Get selection
+        self.console.print(f"\n[bold]Enter numbers to select {category}:[/bold]")
+        self.console.print("[dim]Examples: '1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)[/dim]")
+
+        selection = questionary.text(
+            f"Select {category}",
+            default="all" if category == "wordlists" else ""
         ).ask()
-        # questionary returns None if cancelled, empty list if nothing selected
-        if selected is None:
+
+        if not selection or selection.strip() == "":
             return []
-        if selected:
-            self.console.print(f"[green]✓[/green] Selected {len(selected)} {category}: {', '.join(selected)}")
-        return selected if selected else []
+
+        # Parse selection
+        try:
+            selected_indices = self._parse_selection(selection.strip(), len(keys))
+            selected_keys = [keys[i] for i in selected_indices]
+
+            if selected_keys:
+                self.console.print(f"[green]✓[/green] Selected {len(selected_keys)} {category}: {', '.join(selected_keys)}")
+            return selected_keys
+        except ValueError as e:
+            self.console.print(f"[red]Invalid selection:[/red] {e}")
+            return []
+
+    def _parse_selection(self, selection: str, max_items: int) -> List[int]:
+        """Parse user selection string into list of indices.
+
+        Supports:
+        - Single: "1"
+        - Multiple: "1,2,3"
+        - Range: "1-3"
+        - All: "all"
+        - Mixed: "1,3-5,7"
+
+        Returns 0-based indices.
+        """
+        if selection.lower() == "all":
+            return list(range(max_items))
+
+        indices = set()
+        parts = selection.split(",")
+
+        for part in parts:
+            part = part.strip()
+            if "-" in part:
+                # Range: "1-3"
+                try:
+                    start, end = part.split("-")
+                    start_idx = int(start.strip()) - 1
+                    end_idx = int(end.strip()) - 1
+
+                    if start_idx < 0 or end_idx >= max_items or start_idx > end_idx:
+                        raise ValueError(f"Range {part} is invalid (valid: 1-{max_items})")
+
+                    indices.update(range(start_idx, end_idx + 1))
+                except ValueError as e:
+                    if "invalid literal" in str(e):
+                        raise ValueError(f"Invalid range format: {part}")
+                    raise
+            else:
+                # Single number
+                try:
+                    idx = int(part) - 1
+                    if idx < 0 or idx >= max_items:
+                        raise ValueError(f"Number {part} is out of range (valid: 1-{max_items})")
+                    indices.add(idx)
+                except ValueError as e:
+                    if "invalid literal" in str(e):
+                        raise ValueError(f"Invalid number: {part}")
+                    raise
+
+        return sorted(list(indices))
 
     def _prompt_api_key(self) -> str:
         default = os.environ.get("VAST_API_KEY", "")

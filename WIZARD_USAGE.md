@@ -2,62 +2,104 @@
 
 ## How to Select Items in the Wizard
 
-When you see prompts like this:
+The wizard uses a **numbered menu** for easy, reliable selection. No arrow keys needed!
+
+### Example Display:
 
 ```
 Available wordlists:
-Use arrow keys to navigate, SPACE to select/deselect, ENTER when done
+  1. rockyou: Classic rockyou list in gzip format
+  2. common_10k: 10,000 most common passwords
+  3. seclists_passwords: Full SecLists repo (large download)
 
-Select wordlists for hashcat:
-  ○ rockyou: Classic rockyou list in gzip format
-  ○ common_10k: 10,000 most common passwords
-  ○ seclists_passwords: Full SecLists repo (large download)
+Enter numbers to select wordlists:
+Examples: '1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)
+
+Select wordlists: all
 ```
 
-### ✅ Correct Usage:
+## Selection Formats
 
-1. **Use ↑/↓ arrow keys** to move between options
-2. **Press SPACE** to toggle selection (○ becomes ●)
-3. **Press ENTER** when done selecting
-
-### ❌ Common Mistakes:
-
-- **Just pressing ENTER** without using SPACE = Nothing selected!
-- The cursor position doesn't select automatically
-- You MUST press SPACE to toggle the checkboxes
-
-### Example Session:
-
+### Single Item
 ```
-1. Start at first option (rockyou)
-2. Press SPACE → rockyou is now selected (●)
-3. Press ↓ to move to common_10k
-4. Press SPACE → common_10k is now selected (●)
-5. Press ENTER → Both items are confirmed
+Select wordlists: 1
 ```
+Selects only item #1 (rockyou)
 
-## What You'll See After Selection:
+### Multiple Items (Comma-Separated)
+```
+Select wordlists: 1,2
+```
+Selects items #1 and #2 (rockyou, common_10k)
 
-If successful:
+### Range
+```
+Select wordlists: 1-3
+```
+Selects items #1 through #3 (all items)
+
+### Mixed (Single + Range)
+```
+Select wordlists: 1,3
+```
+Selects items #1 and #3 (rockyou, seclists_passwords)
+
+### Select All
+```
+Select wordlists: all
+```
+Selects all available items
+
+### Spaces Are OK
+```
+Select wordlists: 1, 2, 3
+Select wordlists: 1 - 3
+```
+Both work fine!
+
+## What You'll See After Selection
+
+### Successful Selection:
 ```
 ✓ Selected 2 wordlists: rockyou, common_10k
 ```
 
-If nothing selected:
+### Empty Selection:
 ```
 😺 No wordlists selected. Hashcat requires at least one wordlist.
-😺 Remember: Use SPACE to toggle selection, then ENTER to confirm.
 ? Try again? (Y/n)
 ```
 
-## Quick Test
-
-Run the wizard:
-```bash
-vastcat wizard
+### Invalid Input:
+```
+Invalid selection: Number 5 is out of range (valid: 1-3)
 ```
 
-When prompted for wordlists:
-1. Press SPACE (you should see ● appear)
-2. Press ENTER
-3. You should see "✓ Selected 1 wordlists: ..."
+## Quick Examples
+
+### Select All Wordlists (Default for wordlists)
+```
+Select wordlists: all
+```
+or just press ENTER (default is "all" for wordlists)
+
+### Select Multiple Rules
+```
+Select rules: 1,2
+```
+Selects first two rules
+
+### Select Range of Items
+```
+Select wordlists: 1-2
+```
+Selects first two wordlists
+
+## Why Numbered Menu?
+
+The numbered menu is more reliable than arrow-key checkboxes because:
+- ✅ Works in any terminal (SSH, Docker, tmux, screen)
+- ✅ Works over slow connections
+- ✅ No terminal escape sequence issues
+- ✅ Faster for users who know what they want
+- ✅ Copy-paste friendly for automation
