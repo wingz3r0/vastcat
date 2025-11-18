@@ -43,9 +43,9 @@ ASSET_LIBRARY: Dict[str, Asset] = {
     "weakpass_3": Asset(
         name="weakpass_3.txt",
         category="wordlists",
-        url="https://downloads.skullsecurity.org/passwords/weakpass_3.txt.bz2",
-        filename="weakpass_3.txt.bz2",
-        decompress="bz2",
+        url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Leaked-Databases/weakpass_3.txt",
+        filename="weakpass_3.txt",
+        decompress=None,
         output_name="weakpass_3.txt",
         description="Weakpass top passwords",
     ),
