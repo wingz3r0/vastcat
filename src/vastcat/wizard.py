@@ -37,22 +37,48 @@ class Wizard:
     def run(self) -> None:
         self.console.print(CAT_ASCII)
         self.console.print(cat_say("Welcome to Vastcat's cuddle-free wizard."))
-        sync_targets = self._prompt_asset_sync()
-        if sync_targets:
-            self.console.print(cat_say("Fetching requested assets..."))
-            self.asset_manager.sync(sync_targets)
+
+        # Select and sync wordlists (required)
         wordlist_keys = self._pick_assets("wordlists")
+        if not wordlist_keys:
+            self.console.print(cat_say("No wordlists selected. Hashcat requires at least one wordlist. Exiting."))
+            return
+        self.asset_manager.sync(wordlist_keys)
+
+        # Select and sync rules (optional)
+        self.console.print(cat_say("Rules are optional but highly recommended for better cracking results."))
         rule_keys = self._pick_assets("rules")
-        # ensure selected assets exist
-        self.asset_manager.sync(wordlist_keys + rule_keys)
-        api_key = self._prompt_api_key()
+        if rule_keys:
+            self.asset_manager.sync(rule_keys)
+        else:
+            self.console.print(cat_say("No rules selected. Proceeding with straight wordlist attack."))
+
+        # Optional: Configure notifications
         webhook = self._prompt_discord()
         notifier = Notifier(webhook)
-        hash_path = questionary.text("Path to your hash file", default="~/hashes/hash.txt").ask()
+
+        # Get and validate hash file
+        while True:
+            hash_path = questionary.text("Path to your hash file", default="~/hashes/hash.txt").ask()
+            expanded_path = Path(hash_path).expanduser()
+            if expanded_path.exists():
+                break
+            self.console.print(cat_say(f"File not found: {expanded_path}. Please try again."))
+            if not questionary.confirm("Try another path?", default=True).ask():
+                self.console.print(cat_say("Cannot proceed without a hash file. Exiting."))
+                return
+
         hash_mode = self._determine_hash_mode(hash_path)
         attack_choice = questionary.select("Choose attack mode", choices=list(ATTACK_MODES.keys())).ask()
         attack_mode = ATTACK_MODES[attack_choice]
-        vast_offer = self._select_offer(api_key)
+
+        # Optional: Configure Vast.ai deployment
+        use_vast = questionary.confirm("Deploy to Vast.ai?", default=False).ask()
+        vast_offer = None
+        if use_vast:
+            api_key = self._prompt_api_key()
+            if api_key:
+                vast_offer = self._select_offer(api_key)
         wordlist_paths = self.asset_manager.resolved_paths(wordlist_keys)
         rule_paths = self.asset_manager.resolved_paths(rule_keys)
         command = render_hashcat_command(
@@ -63,14 +89,26 @@ class Wizard:
             rules=self._only_files(rule_paths, "rule"),
         )
         script = render_startup_script(wordlist_paths + rule_paths)
-        self.console.rule(cat_say("Deployment plan"))
+
+        # Show configuration summary
+        self.console.rule(cat_say("Configuration Summary"))
+        self.console.print(f"[bold]Hash file:[/bold] {hash_path}")
+        self.console.print(f"[bold]Hash mode:[/bold] {hash_mode}")
+        self.console.print(f"[bold]Attack mode:[/bold] {attack_mode}")
+        self.console.print(f"[bold]Wordlists:[/bold] {', '.join([p.name for p in wordlist_paths])}")
+        if rule_paths:
+            self.console.print(f"[bold]Rules:[/bold] {', '.join([p.name for p in rule_paths])}")
+        else:
+            self.console.print(f"[bold]Rules:[/bold] None (straight attack)")
+
+        self.console.rule(cat_say("Deployment Plan"))
         if vast_offer:
             self.console.print(
-                f"Offer {vast_offer.id}: {vast_offer.gpu_name} ${vast_offer.hourly:.2f}/hr {vast_offer.vram_gb}GB VRAM"
+                f"Vast.ai Offer {vast_offer.id}: {vast_offer.gpu_name} ${vast_offer.hourly:.2f}/hr {vast_offer.vram_gb}GB VRAM"
             )
         else:
-            self.console.print(cat_say("No offer selected. You'll need to launch manually."))
-        self.console.print(f"Hashcat command:\n[italic]{command}[/italic]")
+            self.console.print(cat_say("Running locally (no Vast.ai deployment)."))
+        self.console.print(f"\n[bold]Hashcat command:[/bold]\n[italic]{command}[/italic]")
         if questionary.confirm("Save startup script to file?", default=True).ask():
             path = Path(questionary.text("Path to save script", default="vastcat-startup.sh").ask())
             path.write_text(script)
@@ -79,19 +117,15 @@ class Wizard:
         self.console.print(cat_say("Ready to run hashcat."))
         if questionary.confirm("Run hashcat locally now?", default=False).ask():
             runner = HashcatRunner(notifier=notifier)
-            runner.run(shlex.split(command)[1:])
-
-    def _prompt_asset_sync(self) -> List[str]:
-        choices = [
-            Choice(title=f"{key}: {asset.description}", value=key)
-            for key, asset in ASSET_LIBRARY.items()
-        ]
-        if not choices:
-            return []
-        return questionary.checkbox(
-            "Pick assets to sync now (space to toggle)",
-            choices=choices,
-        ).ask()
+            try:
+                runner.ensure_binary()
+                runner.run(shlex.split(command)[1:])
+            except FileNotFoundError as exc:
+                self.console.print(cat_say(f"Error: {exc}"))
+                self.console.print(cat_say("Install hashcat first or use the saved script to run on Vast.ai."))
+            except PermissionError as exc:
+                self.console.print(cat_say(f"Error: {exc}"))
+                self.console.print(cat_say("Make sure hashcat binary has execute permissions."))
 
     def _pick_assets(self, category: str) -> List[str]:
         keys = list_assets(category)
@@ -99,12 +133,10 @@ class Wizard:
             return []
         choices = [Choice(title=f"{key}: {ASSET_LIBRARY[key].description}", value=key) for key in keys]
         selected = questionary.checkbox(
-            f"Select {category}",
+            f"Select {category} for hashcat (space to toggle, enter to confirm)",
             choices=choices,
-            instruction="space to toggle",
         ).ask()
         if not selected:
-            self.console.print(cat_say(f"No {category} selected; skipping {category} sync."))
             return []
         return selected
 
