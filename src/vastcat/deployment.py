@@ -5,7 +5,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, List
 
-HASHCAT_URL = "https://hashcat.net/files/hashcat-6.2.6.tar.gz"
+HASHCAT_URL = "https://hashcat.net/files/hashcat-7.1.2.tar.gz"
 
 
 def render_startup_script(asset_paths: Iterable[Path], install_dir: str = "/opt/hashcat") -> str:

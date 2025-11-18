@@ -23,4 +23,8 @@ class Notifier:
                 }
             ],
         }
-        requests.post(self.discord_webhook, data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=10)
+        try:
+            resp = requests.post(self.discord_webhook, data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=10)
+            resp.raise_for_status()
+        except Exception:
+            pass  # Silent fail for notifications

@@ -40,14 +40,14 @@ ASSET_LIBRARY: Dict[str, Asset] = {
         output_name="rockyou.txt",
         description="Classic rockyou list in gzip format",
     ),
-    "weakpass_3": Asset(
-        name="weakpass_3.txt",
+    "common_10k": Asset(
+        name="10k-most-common.txt",
         category="wordlists",
-        url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Leaked-Databases/weakpass_3.txt",
-        filename="weakpass_3.txt",
+        url="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt",
+        filename="10k-most-common.txt",
         decompress=None,
-        output_name="weakpass_3.txt",
-        description="Weakpass top passwords",
+        output_name="10k-most-common.txt",
+        description="10,000 most common passwords",
     ),
     "seclists_passwords": Asset(
         name="SecLists",
@@ -74,13 +74,21 @@ ASSET_LIBRARY: Dict[str, Asset] = {
         output_name="OneRuleToRuleThemAll.rule",
         description="OneRuleToRuleThemAll",
     ),
-    "kaonashi": Asset(
-        name="Kaonashi.rule",
+    "kaonashi_yubaba": Asset(
+        name="yubaba64.rule",
         category="rules",
-        url="https://raw.githubusercontent.com/praetorian-inc/Hob0Rules/master/Kaonashi.rule",
-        filename="Kaonashi.rule",
-        output_name="Kaonashi.rule",
-        description="Kaonashi rule",
+        url="https://raw.githubusercontent.com/kaonashi-passwords/Kaonashi/master/rules/yubaba64.rule",
+        filename="yubaba64.rule",
+        output_name="yubaba64.rule",
+        description="Kaonashi yubaba64 rule",
+    ),
+    "kaonashi_haku": Asset(
+        name="haku34K.rule",
+        category="rules",
+        url="https://raw.githubusercontent.com/kaonashi-passwords/Kaonashi/master/rules/haku34K.rule",
+        filename="haku34K.rule",
+        output_name="haku34K.rule",
+        description="Kaonashi haku34K rule",
     ),
 }
 
@@ -114,7 +122,7 @@ class AssetManager:
     def _download(self, asset: Asset) -> Path:
         target = self._download_target(asset)
         target.parent.mkdir(parents=True, exist_ok=True)
-        with requests.get(asset.url, stream=True, timeout=60) as resp:
+        with requests.get(asset.url, stream=True, timeout=300) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
             with tempfile.NamedTemporaryFile(delete=False) as tmp:
@@ -168,8 +176,8 @@ class AssetManager:
             temp_path.unlink(missing_ok=True)
             return output_path
         # default: move file as-is
-        shutil.move(str(temp_path), download_target)
-        return download_target
+        shutil.move(str(temp_path), output_path)
+        return output_path
 
     def resolved_paths(self, keys: Iterable[str]) -> List[Path]:
         paths: List[Path] = []
