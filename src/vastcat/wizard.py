@@ -41,8 +41,13 @@ class Wizard:
         # Select and sync wordlists (required)
         wordlist_keys = self._pick_assets("wordlists")
         if not wordlist_keys:
-            self.console.print(cat_say("No wordlists selected. Hashcat requires at least one wordlist. Exiting."))
-            return
+            self.console.print(cat_say("No wordlists selected. Hashcat requires at least one wordlist."))
+            self.console.print(cat_say("Remember: Use SPACE to toggle selection, then ENTER to confirm."))
+            if questionary.confirm("Try again?", default=True).ask():
+                wordlist_keys = self._pick_assets("wordlists")
+            if not wordlist_keys:
+                self.console.print(cat_say("Still no wordlists selected. Exiting."))
+                return
         self.asset_manager.sync(wordlist_keys)
 
         # Select and sync rules (optional)
@@ -132,13 +137,18 @@ class Wizard:
         if not keys:
             return []
         choices = [Choice(title=f"{key}: {ASSET_LIBRARY[key].description}", value=key) for key in keys]
+        self.console.print(f"\n[bold]Available {category}:[/bold]")
+        self.console.print("[dim]Use arrow keys to navigate, SPACE to select/deselect, ENTER when done[/dim]\n")
         selected = questionary.checkbox(
-            f"Select {category} for hashcat (space to toggle, enter to confirm)",
+            f"Select {category} for hashcat:",
             choices=choices,
         ).ask()
-        if not selected:
+        # questionary returns None if cancelled, empty list if nothing selected
+        if selected is None:
             return []
-        return selected
+        if selected:
+            self.console.print(f"[green]✓[/green] Selected {len(selected)} {category}: {', '.join(selected)}")
+        return selected if selected else []
 
     def _prompt_api_key(self) -> str:
         default = os.environ.get("VAST_API_KEY", "")
