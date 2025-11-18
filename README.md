@@ -10,23 +10,51 @@ Vastcat is a cat-themed (:3) deployment wizard for launching [hashcat](https://h
 - Provides reusable config stored in `~/.config/vastcat/config.yaml`.
 
 ## Quick start
+
+### 1. Install Vastcat
 ```bash
 pip install -e .
+```
+
+### 2. Install Hashcat
+Vastcat requires hashcat to be installed. Choose your platform:
+
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install -y hashcat
+
+# Fedora/RHEL
+sudo dnf install -y hashcat
+
+# Arch Linux
+sudo pacman -S hashcat
+
+# macOS
+brew install hashcat
+```
+
+Or run: `vastcat install-hashcat` for detailed instructions.
+
+### 3. Run the Wizard
+```bash
 vastcat wizard
 ```
 
 The wizard will:
-1. Ensure your cache directory has the requested wordlists/rules.
-2. Ask for your Vast.ai API key (`VAST_API_KEY`) and suggest GPU offers based on hashcat needs.
-3. Generate a deployment plan (cloud-init/bash script) and optionally call the Vast.ai API for you.
-4. Launch hashcat with the selected attack mode, rules, and wordlists, with Discord webhook notifications if configured.
+1. Download requested wordlists/rules to your cache directory.
+2. Detect your hash type automatically.
+3. Let you choose attack mode and configure the cracking job.
+4. Optionally deploy to Vast.ai GPU instances or run locally.
+5. Send Discord webhook notifications if configured.
 
 ## Commands
+- `vastcat wizard` — friendly guided flow that ties everything together.
+- `vastcat install-hashcat` — show hashcat installation instructions.
 - `vastcat assets sync` — download/update configured assets.
 - `vastcat deploy plan` — print a cloud-init script to bootstrap a new instance.
 - `vastcat deploy start` — call the Vast.ai API to spin up an instance with the plan.
-- `vastcat run` — run hashcat locally on the instance.
-- `vastcat wizard` — friendly guided flow that ties everything together.
+- `vastcat run` — run hashcat locally.
+- `vastcat offers` — list available Vast.ai GPU offers.
 
 ## Configuration
 The first run creates `~/.config/vastcat/config.yaml`. You can edit it to control:

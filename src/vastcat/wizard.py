@@ -120,15 +120,16 @@ class Wizard:
             self.console.print(cat_say(f"Script written to {path}"))
         self.console.print(cat_say("Ready to run hashcat."))
         if questionary.confirm("Run hashcat locally now?", default=False).ask():
-            runner = HashcatRunner(notifier=notifier)
+            # Check for HASHCAT_BINARY environment variable
+            hashcat_binary = os.environ.get("HASHCAT_BINARY")
+            runner = HashcatRunner(binary=hashcat_binary, notifier=notifier)
             try:
                 runner.ensure_binary()
                 runner.run(shlex.split(command)[1:])
             except FileNotFoundError as exc:
-                self.console.print(cat_say(f"Error: {exc}"))
-                self.console.print(cat_say("Install hashcat first or use the saved script to run on Vast.ai."))
+                self.console.print(f"[red]{exc}[/red]")
             except PermissionError as exc:
-                self.console.print(cat_say(f"Error: {exc}"))
+                self.console.print(f"[red]Error:[/red] {exc}")
                 self.console.print(cat_say("Make sure hashcat binary has execute permissions."))
 
     def _pick_assets(self, category: str) -> List[str]:

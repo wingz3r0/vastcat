@@ -128,3 +128,31 @@ def offers(
     console = Console()
     for offer in offers:
         console.print(f"{offer.id}: {offer.gpu_name} ${offer.hourly:.2f}/hr {offer.vram_gb}GB VRAM reliability {offer.reliability}")
+
+
+@app.command(name="install-hashcat")
+def install_hashcat() -> None:
+    """Display instructions for installing hashcat."""
+    console = Console()
+    console.print("\n[bold cyan]Hashcat Installation Instructions[/bold cyan]\n")
+
+    console.print("[bold]Option 1: Package Manager (Recommended)[/bold]")
+    console.print("  Ubuntu/Debian: [cyan]sudo apt update && sudo apt install -y hashcat[/cyan]")
+    console.print("  Fedora/RHEL:   [cyan]sudo dnf install -y hashcat[/cyan]")
+    console.print("  Arch Linux:    [cyan]sudo pacman -S hashcat[/cyan]")
+    console.print("  macOS:         [cyan]brew install hashcat[/cyan]")
+
+    console.print("\n[bold]Option 2: From Source (Latest Version)[/bold]")
+    console.print("  1. Download:  [cyan]wget https://hashcat.net/files/hashcat-7.1.2.tar.gz[/cyan]")
+    console.print("  2. Extract:   [cyan]tar -xzf hashcat-7.1.2.tar.gz[/cyan]")
+    console.print("  3. Build:     [cyan]cd hashcat-7.1.2 && make[/cyan]")
+    console.print("  4. Install:   [cyan]sudo make install[/cyan]")
+    console.print("  Or symlink:   [cyan]sudo ln -s $(pwd)/hashcat /usr/local/bin/hashcat[/cyan]")
+
+    console.print("\n[bold]Option 3: Docker (For Vast.ai deployment)[/bold]")
+    console.print("  Hashcat will be auto-installed on Vast.ai instances via the deployment script.")
+
+    console.print("\n[bold]Verify Installation:[/bold]")
+    console.print("  [cyan]hashcat --version[/cyan]")
+
+    console.print("\n[dim]After installation, run 'vastcat wizard' to start cracking![/dim]\n")

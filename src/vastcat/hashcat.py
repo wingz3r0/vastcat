@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 import os
 import shlex
+import shutil
 import subprocess
 
 from .notifier import Notifier
@@ -12,13 +13,52 @@ from .notifier import Notifier
 
 class HashcatRunner:
     def __init__(self, binary: Optional[str] = None, notifier: Optional[Notifier] = None) -> None:
-        self.binary = binary or "/opt/hashcat/hashcat"
+        self.binary = binary or self._find_hashcat_binary()
         self.notifier = notifier or Notifier()
 
+    def _find_hashcat_binary(self) -> str:
+        """Find hashcat binary in PATH or common locations."""
+        # First, check if hashcat is in PATH
+        hashcat_path = shutil.which("hashcat")
+        if hashcat_path:
+            return hashcat_path
+
+        # Fall back to common installation locations
+        common_paths = [
+            "/opt/hashcat/hashcat",
+            "/usr/bin/hashcat",
+            "/usr/local/bin/hashcat",
+            str(Path.home() / "hashcat" / "hashcat"),
+        ]
+
+        for path_str in common_paths:
+            path = Path(path_str)
+            if path.exists() and os.access(path, os.X_OK):
+                return str(path)
+
+        # Return default and let ensure_binary() raise the error with instructions
+        return "hashcat"
+
     def ensure_binary(self) -> None:
+        # If binary is just "hashcat", try to find it in PATH again
+        if self.binary == "hashcat":
+            path_binary = shutil.which("hashcat")
+            if path_binary:
+                self.binary = path_binary
+                return
+
         path = Path(self.binary)
         if not path.exists():
-            raise FileNotFoundError(f"Cannot find hashcat binary at {path}")
+            raise FileNotFoundError(
+                f"Cannot find hashcat binary at {path}.\n\n"
+                f"Install hashcat:\n"
+                f"  Ubuntu/Debian: sudo apt install hashcat\n"
+                f"  Fedora/RHEL:   sudo dnf install hashcat\n"
+                f"  Arch:          sudo pacman -S hashcat\n"
+                f"  macOS:         brew install hashcat\n"
+                f"  From source:   https://hashcat.net/hashcat/\n\n"
+                f"Or set HASHCAT_BINARY environment variable to your hashcat location."
+            )
         if not os.access(path, os.X_OK):
             raise PermissionError(f"Hashcat binary {path} is not executable")
 
