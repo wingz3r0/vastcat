@@ -38,6 +38,45 @@ class Wizard:
         self.console.print(CAT_ASCII)
         self.console.print(cat_say("Welcome to Vastcat's cuddle-free wizard."))
 
+        # Collect all configuration
+        config = self._collect_configuration()
+        if not config:
+            return
+
+        # Review and edit loop
+        while True:
+            self._show_configuration_summary(config)
+
+            action = questionary.select(
+                "What would you like to do?",
+                choices=[
+                    "Proceed with these settings",
+                    "Edit a parameter",
+                    "Start over",
+                    "Cancel"
+                ]
+            ).ask()
+
+            if action == "Proceed with these settings":
+                break
+            elif action == "Edit a parameter":
+                if not self._edit_configuration(config):
+                    continue
+            elif action == "Start over":
+                config = self._collect_configuration()
+                if not config:
+                    return
+            else:  # Cancel
+                self.console.print(cat_say("Wizard cancelled."))
+                return
+
+        # Generate command and proceed
+        self._execute_configuration(config)
+
+    def _collect_configuration(self) -> Optional[dict]:
+        """Collect all configuration parameters from user."""
+        config = {}
+
         # Select and sync wordlists (required)
         wordlist_keys = self._pick_assets("wordlists")
         if not wordlist_keys:
@@ -46,8 +85,9 @@ class Wizard:
                 wordlist_keys = self._pick_assets("wordlists")
             if not wordlist_keys:
                 self.console.print(cat_say("Still no wordlists selected. Exiting."))
-                return
+                return None
         self.asset_manager.sync(wordlist_keys)
+        config['wordlist_keys'] = wordlist_keys
 
         # Select and sync rules (optional)
         self.console.print(cat_say("Rules are optional but highly recommended for better cracking results."))
@@ -56,10 +96,11 @@ class Wizard:
             self.asset_manager.sync(rule_keys)
         else:
             self.console.print(cat_say("No rules selected. Proceeding with straight wordlist attack."))
+        config['rule_keys'] = rule_keys
 
         # Optional: Configure notifications
         webhook = self._prompt_discord()
-        notifier = Notifier(webhook)
+        config['webhook'] = webhook
 
         # Get and validate hash file
         while True:
@@ -70,57 +111,143 @@ class Wizard:
             self.console.print(cat_say(f"File not found: {expanded_path}. Please try again."))
             if not questionary.confirm("Try another path?", default=True).ask():
                 self.console.print(cat_say("Cannot proceed without a hash file. Exiting."))
-                return
+                return None
+        config['hash_path'] = hash_path
 
         hash_mode = self._determine_hash_mode(hash_path)
+        config['hash_mode'] = hash_mode
+
         attack_choice = questionary.select("Choose attack mode", choices=list(ATTACK_MODES.keys())).ask()
         attack_mode = ATTACK_MODES[attack_choice]
+        config['attack_mode'] = attack_mode
+        config['attack_choice'] = attack_choice
 
         # Optional: Configure Vast.ai deployment
         use_vast = questionary.confirm("Deploy to Vast.ai?", default=False).ask()
+        config['use_vast'] = use_vast
         vast_offer = None
         if use_vast:
             api_key = self._prompt_api_key()
             if api_key:
                 vast_offer = self._select_offer(api_key)
-        wordlist_paths = self.asset_manager.resolved_paths(wordlist_keys)
-        rule_paths = self.asset_manager.resolved_paths(rule_keys)
+        config['vast_offer'] = vast_offer
+
+        return config
+
+    def _show_configuration_summary(self, config: dict) -> None:
+        """Display current configuration to user."""
+        wordlist_paths = self.asset_manager.resolved_paths(config['wordlist_keys'])
+        rule_paths = self.asset_manager.resolved_paths(config['rule_keys'])
+
+        self.console.rule(cat_say("Configuration Summary"))
+        self.console.print(f"[bold]1. Hash file:[/bold] {config['hash_path']}")
+        self.console.print(f"[bold]2. Hash mode:[/bold] {config['hash_mode']}")
+        self.console.print(f"[bold]3. Attack mode:[/bold] {config['attack_choice']}")
+        self.console.print(f"[bold]4. Wordlists:[/bold] {', '.join([p.name for p in wordlist_paths])}")
+        if rule_paths:
+            self.console.print(f"[bold]5. Rules:[/bold] {', '.join([p.name for p in rule_paths])}")
+        else:
+            self.console.print(f"[bold]5. Rules:[/bold] None (straight attack)")
+        self.console.print(f"[bold]6. Discord webhook:[/bold] {'Configured' if config['webhook'] else 'Not configured'}")
+        self.console.print(f"[bold]7. Deployment:[/bold] {'Vast.ai' if config['use_vast'] else 'Local'}\n")
+
+    def _edit_configuration(self, config: dict) -> bool:
+        """Allow user to edit a specific parameter. Returns True if edit was made."""
+        edit_choices = [
+            "1. Hash file path",
+            "2. Hash mode",
+            "3. Attack mode",
+            "4. Wordlists",
+            "5. Rules",
+            "6. Discord webhook",
+            "7. Deployment (Vast.ai/Local)",
+            "Back to summary"
+        ]
+
+        choice = questionary.select("Which parameter would you like to edit?", choices=edit_choices).ask()
+
+        if choice == "Back to summary":
+            return False
+        elif choice.startswith("1"):
+            # Edit hash file
+            while True:
+                hash_path = questionary.text("Path to your hash file", default=config['hash_path']).ask()
+                expanded_path = Path(hash_path).expanduser()
+                if expanded_path.exists():
+                    config['hash_path'] = hash_path
+                    # Re-detect hash mode
+                    config['hash_mode'] = self._determine_hash_mode(hash_path)
+                    break
+                self.console.print(cat_say(f"File not found: {expanded_path}. Please try again."))
+        elif choice.startswith("2"):
+            # Edit hash mode
+            config['hash_mode'] = self._manual_hash_mode(default=config['hash_mode'])
+        elif choice.startswith("3"):
+            # Edit attack mode
+            attack_choice = questionary.select("Choose attack mode", choices=list(ATTACK_MODES.keys()),
+                                             default=config['attack_choice']).ask()
+            config['attack_mode'] = ATTACK_MODES[attack_choice]
+            config['attack_choice'] = attack_choice
+        elif choice.startswith("4"):
+            # Edit wordlists
+            wordlist_keys = self._pick_assets("wordlists")
+            if wordlist_keys:
+                self.asset_manager.sync(wordlist_keys)
+                config['wordlist_keys'] = wordlist_keys
+        elif choice.startswith("5"):
+            # Edit rules
+            rule_keys = self._pick_assets("rules")
+            self.asset_manager.sync(rule_keys)
+            config['rule_keys'] = rule_keys
+        elif choice.startswith("6"):
+            # Edit webhook
+            config['webhook'] = self._prompt_discord()
+        elif choice.startswith("7"):
+            # Edit deployment
+            use_vast = questionary.confirm("Deploy to Vast.ai?", default=config['use_vast']).ask()
+            config['use_vast'] = use_vast
+            if use_vast and not config['vast_offer']:
+                api_key = self._prompt_api_key()
+                if api_key:
+                    config['vast_offer'] = self._select_offer(api_key)
+            elif not use_vast:
+                config['vast_offer'] = None
+
+        return True
+
+    def _execute_configuration(self, config: dict) -> None:
+        """Execute hashcat with the configured parameters."""
+        wordlist_paths = self.asset_manager.resolved_paths(config['wordlist_keys'])
+        rule_paths = self.asset_manager.resolved_paths(config['rule_keys'])
+        notifier = Notifier(config['webhook'])
+
         command = render_hashcat_command(
-            hash_path=hash_path,
-            hash_mode=hash_mode,
-            attack_mode=attack_mode,
+            hash_path=config['hash_path'],
+            hash_mode=config['hash_mode'],
+            attack_mode=config['attack_mode'],
             wordlists=self._only_files(wordlist_paths, "wordlist"),
             rules=self._only_files(rule_paths, "rule"),
         )
         script = render_startup_script(wordlist_paths + rule_paths)
 
-        # Show configuration summary
-        self.console.rule(cat_say("Configuration Summary"))
-        self.console.print(f"[bold]Hash file:[/bold] {hash_path}")
-        self.console.print(f"[bold]Hash mode:[/bold] {hash_mode}")
-        self.console.print(f"[bold]Attack mode:[/bold] {attack_mode}")
-        self.console.print(f"[bold]Wordlists:[/bold] {', '.join([p.name for p in wordlist_paths])}")
-        if rule_paths:
-            self.console.print(f"[bold]Rules:[/bold] {', '.join([p.name for p in rule_paths])}")
-        else:
-            self.console.print(f"[bold]Rules:[/bold] None (straight attack)")
-
         self.console.rule(cat_say("Deployment Plan"))
-        if vast_offer:
+        if config['vast_offer']:
+            offer = config['vast_offer']
             self.console.print(
-                f"Vast.ai Offer {vast_offer.id}: {vast_offer.gpu_name} ${vast_offer.hourly:.2f}/hr {vast_offer.vram_gb}GB VRAM"
+                f"Vast.ai Offer {offer.id}: {offer.gpu_name} ${offer.hourly:.2f}/hr {offer.vram_gb}GB VRAM"
             )
         else:
             self.console.print(cat_say("Running locally (no Vast.ai deployment)."))
         self.console.print(f"\n[bold]Hashcat command:[/bold]\n[italic]{command}[/italic]")
+
         if questionary.confirm("Save startup script to file?", default=True).ask():
             path = Path(questionary.text("Path to save script", default="vastcat-startup.sh").ask())
             path.write_text(script)
             os.chmod(path, 0o750)
             self.console.print(cat_say(f"Script written to {path}"))
+
         self.console.print(cat_say("Ready to run hashcat."))
         if questionary.confirm("Run hashcat locally now?", default=False).ask():
-            # Check for HASHCAT_BINARY environment variable
             hashcat_binary = os.environ.get("HASHCAT_BINARY")
             runner = HashcatRunner(binary=hashcat_binary, notifier=notifier)
             try:

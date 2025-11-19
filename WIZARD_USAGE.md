@@ -95,6 +95,44 @@ Select wordlists: 1-2
 ```
 Selects first two wordlists
 
+## Review & Edit Your Configuration
+
+After entering all parameters, you'll see a summary:
+
+```
+═══════════════════════════ 😺  Configuration Summary ════════════════════════════
+1. Hash file: /workspace/hash.txt
+2. Hash mode: 5600
+3. Attack mode: Straight (mode 0)
+4. Wordlists: rockyou.txt
+5. Rules: dive.rule
+6. Discord webhook: Not configured
+7. Deployment: Local
+
+? What would you like to do?
+  Proceed with these settings
+  Edit a parameter
+  Start over
+  Cancel
+```
+
+### Editing Parameters
+
+If you made a mistake or want to change something:
+
+1. Select **"Edit a parameter"**
+2. Choose which parameter to edit (1-7)
+3. Re-enter the value
+4. Review the updated summary
+5. Repeat until satisfied
+
+### Options Available
+
+- **Proceed with these settings** - Continue to execution
+- **Edit a parameter** - Change one or more settings
+- **Start over** - Go through the wizard from the beginning
+- **Cancel** - Exit without running hashcat
+
 ## Why Numbered Menu?
 
 The numbered menu is more reliable than arrow-key checkboxes because:
