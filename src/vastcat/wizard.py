@@ -74,69 +74,267 @@ class Wizard:
         self._execute_configuration(config)
 
     def _collect_configuration(self) -> Optional[dict]:
-        """Collect all configuration parameters from user."""
+        """Collect all configuration parameters from user with step-by-step navigation."""
         config = {}
 
-        # Select and sync wordlists (required)
-        wordlist_keys = self._pick_assets("wordlists")
-        if not wordlist_keys:
+        # Define wizard steps
+        steps = [
+            ("Select Wordlists", self._step_select_wordlists),
+            ("Select Rules", self._step_select_rules),
+            ("Configure Notifications", self._step_configure_webhook),
+            ("Specify Hash File", self._step_get_hash_file),
+            ("Detect Hash Mode", self._step_determine_hash_mode),
+            ("Choose Attack Mode", self._step_choose_attack_mode),
+            ("Configure Deployment", self._step_configure_vast),
+        ]
+
+        current_step = 0
+
+        while current_step < len(steps):
+            step_name, step_func = steps[current_step]
+            self.console.print(f"\n[bold cyan]Step {current_step + 1}/{len(steps)}: {step_name}[/bold cyan]")
+
+            result = step_func(config, can_go_back=(current_step > 0))
+
+            if result == "back":
+                current_step -= 1
+            elif result == "cancel":
+                self.console.print(cat_say("Wizard cancelled."))
+                return None
+            elif result == "next":
+                current_step += 1
+            else:
+                # Should not happen, but handle gracefully
+                current_step += 1
+
+        return config
+
+    def _step_select_wordlists(self, config: dict, can_go_back: bool) -> str:
+        """Step 1: Select wordlists."""
+        wordlist_keys = self._pick_assets_with_back("wordlists", can_go_back)
+
+        if wordlist_keys == "back":
+            return "back"
+        elif wordlist_keys == "cancel":
+            return "cancel"
+        elif not wordlist_keys:
             self.console.print(cat_say("No wordlists selected. Hashcat requires at least one wordlist."))
             if questionary.confirm("Try again?", default=True).ask():
-                wordlist_keys = self._pick_assets("wordlists")
-            if not wordlist_keys:
-                self.console.print(cat_say("Still no wordlists selected. Exiting."))
-                return None
+                return self._step_select_wordlists(config, can_go_back)
+            else:
+                return "cancel"
+
         self.asset_manager.sync(wordlist_keys)
         config['wordlist_keys'] = wordlist_keys
+        return "next"
 
-        # Select and sync rules (optional)
+    def _step_select_rules(self, config: dict, can_go_back: bool) -> str:
+        """Step 2: Select rules."""
         self.console.print(cat_say("Rules are optional but highly recommended for better cracking results."))
-        rule_keys = self._pick_assets("rules")
-        if rule_keys:
-            self.asset_manager.sync(rule_keys)
-        else:
+        rule_keys = self._pick_assets_with_back("rules", can_go_back)
+
+        if rule_keys == "back":
+            return "back"
+        elif rule_keys == "cancel":
+            return "cancel"
+        elif not rule_keys:
             self.console.print(cat_say("No rules selected. Proceeding with straight wordlist attack."))
-        config['rule_keys'] = rule_keys
+        else:
+            self.asset_manager.sync(rule_keys)
 
-        # Optional: Configure notifications
-        webhook = self._prompt_discord()
+        config['rule_keys'] = rule_keys if rule_keys not in ["back", "cancel"] else []
+        return "next"
+
+    def _step_configure_webhook(self, config: dict, can_go_back: bool) -> str:
+        """Step 3: Configure Discord webhook."""
+        webhook = self._prompt_discord_with_back(can_go_back)
+
+        if webhook == "back":
+            return "back"
+        elif webhook == "cancel":
+            return "cancel"
+
         config['webhook'] = webhook
+        return "next"
 
-        # Get and validate hash file
+    def _step_get_hash_file(self, config: dict, can_go_back: bool) -> str:
+        """Step 4: Get hash file path."""
         hashes_dir = self.config.hashes_dir
         self.console.print(cat_say(f"Upload your hash files to: {hashes_dir}"))
 
         default_hash_path = str(hashes_dir / "hash.txt")
+
         while True:
-            hash_path = questionary.text("Path to your hash file", default=default_hash_path).ask()
+            prompt_text = "Path to your hash file (or 'back' to go back)"
+            hash_path = questionary.text(prompt_text, default=default_hash_path).ask()
+
+            if hash_path and hash_path.lower() == "back" and can_go_back:
+                return "back"
+
             expanded_path = Path(hash_path).expanduser()
             if expanded_path.exists():
-                break
+                config['hash_path'] = hash_path
+                return "next"
+
             self.console.print(cat_say(f"File not found: {expanded_path}. Please try again."))
             if not questionary.confirm("Try another path?", default=True).ask():
-                self.console.print(cat_say("Cannot proceed without a hash file. Exiting."))
-                return None
-        config['hash_path'] = hash_path
+                if can_go_back and questionary.confirm("Go back to previous step?", default=False).ask():
+                    return "back"
+                return "cancel"
 
-        hash_mode = self._determine_hash_mode(hash_path)
+    def _step_determine_hash_mode(self, config: dict, can_go_back: bool) -> str:
+        """Step 5: Determine hash mode."""
+        hash_mode = self._determine_hash_mode_with_back(config['hash_path'], can_go_back)
+
+        if hash_mode == "back":
+            return "back"
+        elif hash_mode == "cancel":
+            return "cancel"
+
         config['hash_mode'] = hash_mode
+        return "next"
 
-        attack_choice = questionary.select("Choose attack mode", choices=list(ATTACK_MODES.keys())).ask()
-        attack_mode = ATTACK_MODES[attack_choice]
-        config['attack_mode'] = attack_mode
+    def _step_choose_attack_mode(self, config: dict, can_go_back: bool) -> str:
+        """Step 6: Choose attack mode."""
+        choices = list(ATTACK_MODES.keys())
+        if can_go_back:
+            choices.append("← Go back")
+
+        attack_choice = questionary.select("Choose attack mode", choices=choices).ask()
+
+        if attack_choice == "← Go back":
+            return "back"
+
+        config['attack_mode'] = ATTACK_MODES[attack_choice]
         config['attack_choice'] = attack_choice
+        return "next"
 
-        # Optional: Configure Vast.ai deployment
+    def _step_configure_vast(self, config: dict, can_go_back: bool) -> str:
+        """Step 7: Configure Vast.ai deployment."""
         use_vast = questionary.confirm("Deploy to Vast.ai?", default=False).ask()
+
         config['use_vast'] = use_vast
         vast_offer = None
+
         if use_vast:
             api_key = self._prompt_api_key()
             if api_key:
                 vast_offer = self._select_offer(api_key)
-        config['vast_offer'] = vast_offer
 
-        return config
+        config['vast_offer'] = vast_offer
+        return "next"
+
+    def _pick_assets_with_back(self, category: str, can_go_back: bool):
+        """Pick assets with back navigation support."""
+        keys = list_assets(category)
+        if not keys:
+            return []
+
+        # Display available options
+        self.console.print(f"\n[bold]Available {category}:[/bold]")
+
+        # For rules, add a "no rules" option at index 0
+        if category == "rules":
+            self.console.print(f"  [cyan]0[/cyan]. No rules (straight wordlist attack)")
+
+        for idx, key in enumerate(keys, 1):
+            asset = ASSET_LIBRARY[key]
+            self.console.print(f"  [cyan]{idx}[/cyan]. {key}: [dim]{asset.description}[/dim]")
+
+        # Get selection
+        self.console.print(f"\n[bold]Enter numbers to select {category}:[/bold]")
+        if category == "rules":
+            examples = "'0' (no rules), '1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)"
+        else:
+            examples = "'1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)"
+
+        if can_go_back:
+            examples += ", 'back' (go back)"
+
+        self.console.print(f"[dim]Examples: {examples}[/dim]")
+
+        selection = questionary.text(
+            f"Select {category}",
+            default="all" if category == "wordlists" else ""
+        ).ask()
+
+        if not selection or selection.strip() == "":
+            return []
+
+        # Check for back command
+        if selection.strip().lower() == "back" and can_go_back:
+            return "back"
+
+        # Handle "0" for no rules
+        if category == "rules" and selection.strip() == "0":
+            self.console.print(f"[green]✓[/green] No rules selected (straight wordlist attack)")
+            return []
+
+        # Parse selection
+        try:
+            selected_indices = self._parse_selection(selection.strip(), len(keys))
+            selected_keys = [keys[i] for i in selected_indices]
+
+            if selected_keys:
+                self.console.print(f"[green]✓[/green] Selected {len(selected_keys)} {category}: {', '.join(selected_keys)}")
+            return selected_keys
+        except ValueError as e:
+            self.console.print(f"[red]Invalid selection:[/red] {e}")
+            return []
+
+    def _prompt_discord_with_back(self, can_go_back: bool):
+        """Prompt for Discord webhook with back navigation support."""
+        default = self.config.get("discord_webhook")
+        prompt_text = "Discord webhook (optional, or 'back' to go back)" if can_go_back else "Discord webhook (optional)"
+        webhook = questionary.text(prompt_text, default=default or "").ask()
+
+        if webhook and webhook.lower() == "back" and can_go_back:
+            return "back"
+
+        if webhook:
+            self.config.set("discord_webhook", webhook)
+
+        return webhook
+
+    def _determine_hash_mode_with_back(self, hash_path: str, can_go_back: bool):
+        """Determine hash mode with back navigation support."""
+        sample = sample_from_file(hash_path)
+        if not sample:
+            self.console.print(cat_say("Could not read a hash sample; please enter the mode manually."))
+            return self._manual_hash_mode()
+
+        guesses = detect_hash_modes(sample)
+        if not guesses:
+            self.console.print(cat_say("No matching hash types detected. Falling back to manual entry."))
+            return self._manual_hash_mode()
+
+        self.console.print(cat_say(f"Sample hash snippet: {sample[:24]}..."))
+        choices = [
+            Choice(
+                title=f"{guess.name} (mode {guess.mode}) — {guess.reason}",
+                value=guess.mode,
+            )
+            for guess in guesses
+        ]
+        choices.append(Choice(title="Enter manually", value="__manual__"))
+
+        if can_go_back:
+            choices.append(Choice(title="← Go back", value="__back__"))
+
+        selection = questionary.select(
+            "Detected hash types (confirm or pick manually)",
+            choices=choices,
+        ).ask()
+
+        if selection == "__back__":
+            return "back"
+        elif selection == "__manual__":
+            return self._manual_hash_mode()
+
+        chosen = self._guess_from_mode(guesses, selection)
+        if chosen:
+            self.console.print(cat_say(f"Using {chosen.name} (mode {chosen.mode})."))
+        return selection
 
     def _show_configuration_summary(self, config: dict) -> None:
         """Display current configuration to user."""
