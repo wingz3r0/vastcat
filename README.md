@@ -3,6 +3,7 @@
 Vastcat is a cat-themed (:3) deployment wizard for launching [hashcat](https://hashcat.net/hashcat/) workloads on [Vast.ai](https://vast.ai/). It automates wordlist/ruleset collection, instance provisioning, and job orchestration with optional Discord notifications.
 
 ## Features
+- **Automatic hashcat installation** during vastcat setup (detects your platform and installs via package manager).
 - Fetches popular wordlists and rules: RockYou, WeakPass, Seclists, Dive, Kaonashi, OneRuleToRuleThemAll, and more.
 - Guides you through Vast.ai offer selection, storage layout, and hashcat attack planning via an interactive wizard.
 - Generates reproducible deployment manifests and shell scripts to bootstrap Ubuntu+CUDA base images.
@@ -16,26 +17,11 @@ Vastcat is a cat-themed (:3) deployment wizard for launching [hashcat](https://h
 pip install -e .
 ```
 
-### 2. Install Hashcat
-Vastcat requires hashcat to be installed. Choose your platform:
+**Hashcat will be automatically installed** during the installation process. The installer will detect your platform (Ubuntu, Fedora, Arch, macOS) and use the appropriate package manager.
 
-```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install -y hashcat
+If automatic installation fails, run `vastcat install-hashcat` for manual installation instructions.
 
-# Fedora/RHEL
-sudo dnf install -y hashcat
-
-# Arch Linux
-sudo pacman -S hashcat
-
-# macOS
-brew install hashcat
-```
-
-Or run: `vastcat install-hashcat` for detailed instructions.
-
-### 3. Run the Wizard
+### 2. Run the Wizard
 ```bash
 vastcat wizard
 ```
