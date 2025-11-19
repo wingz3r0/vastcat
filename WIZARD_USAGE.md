@@ -2,7 +2,7 @@
 
 ## Wizard Navigation
 
-The wizard guides you through **7 steps** to configure your hashcat job. Each step is numbered and shows your progress (e.g., "Step 2/7: Select Rules").
+The wizard guides you through **6 steps** to configure your hashcat job. Each step is numbered and shows your progress (e.g., "Step 2/6: Select Rules").
 
 ### Going Back to Previous Steps
 
@@ -141,7 +141,7 @@ After entering all parameters, you'll see a summary:
 If you made a mistake or want to change something:
 
 1. Select **"Edit a parameter"**
-2. Choose which parameter to edit (1-7)
+2. Choose which parameter to edit (1-6)
 3. Re-enter the value
 4. Review the updated summary
 5. Repeat until satisfied
@@ -159,13 +159,13 @@ Vastcat provides **two convenient ways** to fix mistakes:
 
 ### 1. Go Back During Wizard (Step-by-Step Navigation)
 
-While progressing through the 7 steps, you can **immediately go back** to the previous step:
+While progressing through the 6 steps, you can **immediately go back** to the previous step:
 
 ```
-Step 3/7: Configure Notifications
+Step 3/6: Configure Notifications
 Discord webhook (optional, or 'back' to go back): back
 
-[Returns to Step 2/7: Select Rules]
+[Returns to Step 2/6: Select Rules]
 ```
 
 **Use this when**: You realize a mistake right away and want to fix it immediately.
@@ -191,7 +191,7 @@ Which parameter would you like to edit?
 
 ### Example Workflow
 
-1. **Step 1-7**: Go through wizard, use `back` if you catch mistakes early
+1. **Step 1-6**: Go through wizard, use `back` if you catch mistakes early
 2. **Review Screen**: Check the complete configuration summary
 3. **Edit if needed**: Use "Edit a parameter" for any final adjustments
 4. **Proceed**: Run hashcat with your perfect configuration!

@@ -1,12 +1,13 @@
 # Vastcat
 
-Vastcat is a cat-themed (:3) deployment wizard for launching [hashcat](https://hashcat.net/hashcat/) workloads on [Vast.ai](https://vast.ai/). It automates wordlist/ruleset collection, instance provisioning, and job orchestration with optional Discord notifications.
+Vastcat is a cat-themed (:3) interactive wizard for configuring and running [hashcat](https://hashcat.net/hashcat/) password cracking jobs. It automates wordlist/ruleset management, hash type detection, and provides an intuitive step-by-step interface with optional Discord notifications.
 
 ## Features
 - **Automatic hashcat installation** during vastcat setup (detects your platform and installs via package manager).
+- **Interactive wizard** with 6-step configuration flow and back navigation.
+- **Automatic hash type detection** for common formats (MD5, SHA, NTLM, bcrypt, etc.).
 - Fetches popular wordlists and rules: RockYou, WeakPass, Seclists, Dive, Kaonashi, OneRuleToRuleThemAll, and more.
-- Guides you through Vast.ai offer selection, storage layout, and hashcat attack planning via an interactive wizard.
-- Generates reproducible deployment manifests and shell scripts to bootstrap Ubuntu+CUDA base images.
+- Generates reproducible hashcat commands and deployment scripts.
 - Sends run status updates to Discord via webhook.
 - Provides reusable config stored in `~/.config/vastcat/config.yaml`.
 
@@ -26,21 +27,22 @@ If automatic installation fails, run `vastcat install-hashcat` for manual instal
 vastcat wizard
 ```
 
-The wizard will:
-1. Download requested wordlists/rules to your cache directory.
-2. Detect your hash type automatically.
-3. Let you choose attack mode and configure the cracking job.
-4. Optionally deploy to Vast.ai GPU instances or run locally.
-5. Send Discord webhook notifications if configured.
+The wizard will guide you through 6 steps:
+1. **Select Wordlists** - Choose from popular wordlists (RockYou, WeakPass, SecLists).
+2. **Select Rules** - Optional rule sets for transformation attacks.
+3. **Configure Notifications** - Set up Discord webhooks for status updates.
+4. **Specify Hash File** - Point to your hash file (stored in `~/vastcat/hashes/`).
+5. **Detect Hash Mode** - Automatic detection with manual override option.
+6. **Choose Attack Mode** - Straight, combinator, mask, or hybrid attacks.
+
+After configuration, review your settings and run hashcat locally or save a deployment script.
 
 ## Commands
-- `vastcat wizard` — friendly guided flow that ties everything together.
-- `vastcat install-hashcat` — show hashcat installation instructions.
-- `vastcat assets sync` — download/update configured assets.
-- `vastcat deploy plan` — print a cloud-init script to bootstrap a new instance.
-- `vastcat deploy start` — call the Vast.ai API to spin up an instance with the plan.
-- `vastcat run` — run hashcat locally.
-- `vastcat offers` — list available Vast.ai GPU offers.
+- `vastcat wizard` — Interactive guided flow (recommended).
+- `vastcat install-hashcat` — Show hashcat installation instructions.
+- `vastcat assets sync` — Download/update configured wordlists and rules.
+- `vastcat assets list` — List all available assets.
+- `vastcat run` — Run hashcat with manual parameters (advanced users).
 
 ## Configuration
 The first run creates `~/.config/vastcat/config.yaml` and sets up directories:
@@ -49,9 +51,9 @@ The first run creates `~/.config/vastcat/config.yaml` and sets up directories:
 
 You can edit the config to control:
 - Cache and hashes directory locations
-- Default Vast.ai image (Ubuntu + CUDA)
-- Hashcat tuning flags (workload profile, power limits, etc.)
+- Hashcat binary path and tuning flags
 - Discord webhook URL for alerts
+- Asset download preferences
 
 ## Security
 Review all downloaded assets and generated scripts before running them on production data. Vastcat does not store hashes or cracked output; they remain on your instance.

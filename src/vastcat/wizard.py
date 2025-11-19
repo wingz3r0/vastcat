@@ -17,7 +17,6 @@ from .detect import HashGuess, detect_hash_modes, sample_from_file
 from .hashcat import HashcatRunner
 from .notifier import Notifier
 from .theme import CAT_ASCII, cat_say
-from .vast import VastClient, VastError, Offer
 
 
 ATTACK_MODES = {
@@ -85,7 +84,6 @@ class Wizard:
             ("Specify Hash File", self._step_get_hash_file),
             ("Detect Hash Mode", self._step_determine_hash_mode),
             ("Choose Attack Mode", self._step_choose_attack_mode),
-            ("Configure Deployment", self._step_configure_vast),
         ]
 
         current_step = 0
@@ -207,21 +205,6 @@ class Wizard:
 
         config['attack_mode'] = ATTACK_MODES[attack_choice]
         config['attack_choice'] = attack_choice
-        return "next"
-
-    def _step_configure_vast(self, config: dict, can_go_back: bool) -> str:
-        """Step 7: Configure Vast.ai deployment."""
-        use_vast = questionary.confirm("Deploy to Vast.ai?", default=False).ask()
-
-        config['use_vast'] = use_vast
-        vast_offer = None
-
-        if use_vast:
-            api_key = self._prompt_api_key()
-            if api_key:
-                vast_offer = self._select_offer(api_key)
-
-        config['vast_offer'] = vast_offer
         return "next"
 
     def _pick_assets_with_back(self, category: str, can_go_back: bool):
@@ -350,8 +333,7 @@ class Wizard:
             self.console.print(f"[bold]5. Rules:[/bold] {', '.join([p.name for p in rule_paths])}")
         else:
             self.console.print(f"[bold]5. Rules:[/bold] None (straight attack)")
-        self.console.print(f"[bold]6. Discord webhook:[/bold] {'Configured' if config['webhook'] else 'Not configured'}")
-        self.console.print(f"[bold]7. Deployment:[/bold] {'Vast.ai' if config['use_vast'] else 'Local'}\n")
+        self.console.print(f"[bold]6. Discord webhook:[/bold] {'Configured' if config['webhook'] else 'Not configured'}\n")
 
     def _edit_configuration(self, config: dict) -> bool:
         """Allow user to edit a specific parameter. Returns True if edit was made."""
@@ -362,7 +344,6 @@ class Wizard:
             "4. Wordlists",
             "5. Rules",
             "6. Discord webhook",
-            "7. Deployment (Vast.ai/Local)",
             "Back to summary"
         ]
 
@@ -404,16 +385,6 @@ class Wizard:
         elif choice.startswith("6"):
             # Edit webhook
             config['webhook'] = self._prompt_discord()
-        elif choice.startswith("7"):
-            # Edit deployment
-            use_vast = questionary.confirm("Deploy to Vast.ai?", default=config['use_vast']).ask()
-            config['use_vast'] = use_vast
-            if use_vast and not config['vast_offer']:
-                api_key = self._prompt_api_key()
-                if api_key:
-                    config['vast_offer'] = self._select_offer(api_key)
-            elif not use_vast:
-                config['vast_offer'] = None
 
         return True
 
@@ -432,15 +403,8 @@ class Wizard:
         )
         script = render_startup_script(wordlist_paths + rule_paths)
 
-        self.console.rule(cat_say("Deployment Plan"))
-        if config['vast_offer']:
-            offer = config['vast_offer']
-            self.console.print(
-                f"Vast.ai Offer {offer.id}: {offer.gpu_name} ${offer.hourly:.2f}/hr {offer.vram_gb}GB VRAM"
-            )
-        else:
-            self.console.print(cat_say("Running locally (no Vast.ai deployment)."))
-        self.console.print(f"\n[bold]Hashcat command:[/bold]\n[italic]{command}[/italic]")
+        self.console.rule(cat_say("Hashcat Command"))
+        self.console.print(f"\n[bold]Command:[/bold]\n[italic]{command}[/italic]")
 
         if questionary.confirm("Save startup script to file?", default=True).ask():
             path = Path(questionary.text("Path to save script", default="vastcat-startup.sh").ask())
@@ -559,41 +523,12 @@ class Wizard:
 
         return sorted(list(indices))
 
-    def _prompt_api_key(self) -> str:
-        default = os.environ.get("VAST_API_KEY", "")
-        api_key = questionary.text("Vast.ai API key", default=default).ask()
-        if api_key:
-            os.environ["VAST_API_KEY"] = api_key
-        return api_key
-
     def _prompt_discord(self) -> Optional[str]:
         default = self.config.get("discord_webhook")
         webhook = questionary.text("Discord webhook (optional)", default=default or "").ask()
         if webhook:
             self.config.set("discord_webhook", webhook)
         return webhook
-
-    def _select_offer(self, api_key: str) -> Optional[Offer]:
-        if not api_key:
-            self.console.print(cat_say("Skipping Vast.ai lookup (no API key)."))
-            return None
-        try:
-            client = VastClient(api_key=api_key)
-            offers = client.list_offers()
-        except VastError as exc:
-            self.console.print(cat_say(f"Vast.ai query failed: {exc}"))
-            return None
-        if not offers:
-            self.console.print(cat_say("No offers returned."))
-            return None
-        choice = questionary.select(
-            "Choose a GPU offer",
-            choices=[Choice(title=f"{o.id} | {o.gpu_name} | ${o.hourly:.2f}/hr", value=o.id) for o in offers],
-        ).ask()
-        for offer in offers:
-            if offer.id == choice:
-                return offer
-        return None
 
     def _only_files(self, paths: List[Path], label: str) -> List[str]:
         files: List[str] = []

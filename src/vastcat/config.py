@@ -11,11 +11,8 @@ CONFIG_PATH = Path(os.environ.get("VASTCAT_CONFIG", "~/.config/vastcat/config.ya
 DEFAULTS: Dict[str, Any] = {
     "cache_dir": str(Path(os.environ.get("VASTCAT_CACHE", "~/.cache/vastcat")).expanduser()),
     "hashes_dir": str(Path("~/vastcat/hashes").expanduser()),
-    "base_image": "pytorch/pytorch:latest",
-    "ubuntu_cuda_image": "nvidia/cuda:12.2.0-devel-ubuntu22.04",
     "hashcat_binary": "/opt/hashcat/hashcat",
     "discord_webhook": None,
-    "vast_api_url": "https://api.vast.ai/v0",
     "auto_download_assets": True,
     "asset_manifest": "~/.config/vastcat/assets.yaml",
 }
