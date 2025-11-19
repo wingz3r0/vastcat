@@ -10,6 +10,7 @@ import yaml
 CONFIG_PATH = Path(os.environ.get("VASTCAT_CONFIG", "~/.config/vastcat/config.yaml")).expanduser()
 DEFAULTS: Dict[str, Any] = {
     "cache_dir": str(Path(os.environ.get("VASTCAT_CACHE", "~/.cache/vastcat")).expanduser()),
+    "hashes_dir": str(Path("~/vastcat/hashes").expanduser()),
     "base_image": "pytorch/pytorch:latest",
     "ubuntu_cuda_image": "nvidia/cuda:12.2.0-devel-ubuntu22.04",
     "hashcat_binary": "/opt/hashcat/hashcat",
@@ -50,6 +51,12 @@ class Config:
     @property
     def cache_dir(self) -> Path:
         path = Path(self.data["cache_dir"]).expanduser()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def hashes_dir(self) -> Path:
+        path = Path(self.data["hashes_dir"]).expanduser()
         path.mkdir(parents=True, exist_ok=True)
         return path
 

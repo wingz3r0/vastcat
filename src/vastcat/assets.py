@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 import hashlib
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import zipfile
@@ -48,6 +49,15 @@ ASSET_LIBRARY: Dict[str, Asset] = {
         decompress=None,
         output_name="10k-most-common.txt",
         description="10,000 most common passwords",
+    ),
+    "weakpass_3": Asset(
+        name="weakpass_3",
+        category="wordlists",
+        url="https://download.weakpass.com/wordlists/1947/weakpass_3.7z",
+        filename="weakpass_3.7z",
+        decompress="7z",
+        output_name="weakpass_3",
+        description="Weakpass 3 wordlist (28GB decompressed, large download)",
     ),
     "seclists_passwords": Asset(
         name="SecLists",
@@ -173,6 +183,27 @@ class AssetManager:
         if asset.decompress == "bz2":
             with bz2.open(temp_path, "rb") as src, open(output_path, "wb") as dst:
                 shutil.copyfileobj(src, dst)
+            temp_path.unlink(missing_ok=True)
+            return output_path
+        if asset.decompress == "7z":
+            # Extract 7z using system command
+            extract_dir = output_path
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                subprocess.run(
+                    ["7z", "x", str(temp_path), f"-o{extract_dir}", "-y"],
+                    check=True,
+                    capture_output=True
+                )
+            except FileNotFoundError:
+                raise RuntimeError(
+                    "7z command not found. Install p7zip: "
+                    "Ubuntu/Debian: sudo apt install p7zip-full | "
+                    "Fedora: sudo dnf install p7zip | "
+                    "macOS: brew install p7zip"
+                )
+            except subprocess.CalledProcessError as e:
+                raise RuntimeError(f"7z extraction failed: {e.stderr.decode()}")
             temp_path.unlink(missing_ok=True)
             return output_path
         # default: move file as-is

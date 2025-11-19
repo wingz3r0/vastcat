@@ -43,11 +43,15 @@ The wizard will:
 - `vastcat offers` — list available Vast.ai GPU offers.
 
 ## Configuration
-The first run creates `~/.config/vastcat/config.yaml`. You can edit it to control:
-- Cache directory for assets.
-- Default Vast.ai image (Ubuntu + CUDA).
-- Hashcat tuning flags (workload profile, power limits, etc.).
-- Discord webhook URL for alerts.
+The first run creates `~/.config/vastcat/config.yaml` and sets up directories:
+- **Cache directory** (`~/.cache/vastcat/`) - Downloaded wordlists and rules
+- **Hashes directory** (`~/vastcat/hashes/`) - Upload your hash files here
+
+You can edit the config to control:
+- Cache and hashes directory locations
+- Default Vast.ai image (Ubuntu + CUDA)
+- Hashcat tuning flags (workload profile, power limits, etc.)
+- Discord webhook URL for alerts
 
 ## Security
 Review all downloaded assets and generated scripts before running them on production data. Vastcat does not store hashes or cracked output; they remain on your instance.

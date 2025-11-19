@@ -103,8 +103,12 @@ class Wizard:
         config['webhook'] = webhook
 
         # Get and validate hash file
+        hashes_dir = self.config.hashes_dir
+        self.console.print(cat_say(f"Upload your hash files to: {hashes_dir}"))
+
+        default_hash_path = str(hashes_dir / "hash.txt")
         while True:
-            hash_path = questionary.text("Path to your hash file", default="~/hashes/hash.txt").ask()
+            hash_path = questionary.text("Path to your hash file", default=default_hash_path).ask()
             expanded_path = Path(hash_path).expanduser()
             if expanded_path.exists():
                 break
@@ -267,13 +271,21 @@ class Wizard:
 
         # Display available options
         self.console.print(f"\n[bold]Available {category}:[/bold]")
+
+        # For rules, add a "no rules" option at index 0
+        if category == "rules":
+            self.console.print(f"  [cyan]0[/cyan]. No rules (straight wordlist attack)")
+
         for idx, key in enumerate(keys, 1):
             asset = ASSET_LIBRARY[key]
             self.console.print(f"  [cyan]{idx}[/cyan]. {key}: [dim]{asset.description}[/dim]")
 
         # Get selection
         self.console.print(f"\n[bold]Enter numbers to select {category}:[/bold]")
-        self.console.print("[dim]Examples: '1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)[/dim]")
+        if category == "rules":
+            self.console.print("[dim]Examples: '0' (no rules), '1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)[/dim]")
+        else:
+            self.console.print("[dim]Examples: '1' (single), '1,2' (multiple), '1-3' (range), 'all' (select all)[/dim]")
 
         selection = questionary.text(
             f"Select {category}",
@@ -281,6 +293,11 @@ class Wizard:
         ).ask()
 
         if not selection or selection.strip() == "":
+            return []
+
+        # Handle "0" for no rules
+        if category == "rules" and selection.strip() == "0":
+            self.console.print(f"[green]✓[/green] No rules selected (straight wordlist attack)")
             return []
 
         # Parse selection
