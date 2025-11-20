@@ -18,7 +18,8 @@ dependencies = [
     "questionary>=2.0.1",
     "requests>=2.31.0",
     "PyYAML>=6.0.1",
-    "tqdm>=4.66.2"
+    "tqdm>=4.66.2",
+    "name-that-hash>=1.11.0"
 ]
 
 [project.scripts]

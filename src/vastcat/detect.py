@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 import re
 
+try:
+    from name_that_hash import runner as nth_runner
+    NTH_AVAILABLE = True
+except ImportError:
+    NTH_AVAILABLE = False
+
 
 @dataclass
 class HashGuess:
@@ -66,13 +72,72 @@ _NAMED_SPECIALS = {
 def detect_hash_modes(sample: str) -> List[HashGuess]:
     """Return best-guess hash modes matching the provided sample.
 
+    Uses name-that-hash library when available (300+ hash types).
+    Falls back to regex-based detection if library is not installed.
+    """
+    sample = sample.strip()
+    if not sample:
+        return []
+
+    # Use name-that-hash if available (much better detection)
+    if NTH_AVAILABLE:
+        return _detect_with_name_that_hash(sample)
+
+    # Fallback to regex-based detection
+    return _detect_with_regex(sample)
+
+
+def _detect_with_name_that_hash(sample: str) -> List[HashGuess]:
+    """Detect hash type using name-that-hash library."""
+    try:
+        # Use full detection for comprehensive hash type coverage
+        result = nth_runner.api_return_hashes_as_dict([sample], {})
+
+        if not result or sample not in result:
+            return []
+
+        matches: List[HashGuess] = []
+        hash_results = result[sample]
+
+        # Convert name-that-hash results to HashGuess objects
+        for idx, match in enumerate(hash_results[:10]):  # Limit to top 10
+            name = match.get("name", "Unknown")
+            hashcat_mode = match.get("hashcat")
+            description = match.get("description", "")
+
+            # Skip if no hashcat mode
+            if hashcat_mode is None:
+                continue
+
+            # Calculate confidence based on position (first match is most likely)
+            # name-that-hash orders by popularity/likelihood
+            confidence = 0.95 - (idx * 0.05)  # 0.95, 0.90, 0.85, ...
+            confidence = max(confidence, 0.5)  # Floor at 0.5
+
+            # Build reason string
+            reason = description if description else f"Detected as {name}"
+
+            matches.append(HashGuess(
+                name=name,
+                mode=str(hashcat_mode),
+                confidence=confidence,
+                reason=reason
+            ))
+
+        return matches
+
+    except Exception:
+        # If name-that-hash fails, fall back to regex
+        return _detect_with_regex(sample)
+
+
+def _detect_with_regex(sample: str) -> List[HashGuess]:
+    """Fallback regex-based hash detection.
+
     Checks more specific formats first (NetNTLM, bcrypt, etc.)
     before falling back to simple hex hashes.
     """
-    sample = sample.strip()
     matches: List[HashGuess] = []
-    if not sample:
-        return matches
 
     # Check named/special formats FIRST (more specific)
     for mode, guess in _NAMED_SPECIALS.items():
