@@ -35,7 +35,7 @@ class Wizard:
 
     def run(self) -> None:
         self.console.print(CAT_ASCII)
-        self.console.print(cat_say("Welcome to Vastcat's cuddle-free wizard."))
+        self.console.print(cat_say("Welcome to Vastcat's wizard."))
 
         # Collect all configuration
         config = self._collect_configuration()
