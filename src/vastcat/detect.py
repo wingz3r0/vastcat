@@ -4,13 +4,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional
+import logging
 import re
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 try:
     from name_that_hash import runner as nth_runner
     NTH_AVAILABLE = True
 except ImportError:
     NTH_AVAILABLE = False
+    logger.warning("name-that-hash library not available, using regex fallback")
 
 
 @dataclass
@@ -77,14 +82,28 @@ def detect_hash_modes(sample: str) -> List[HashGuess]:
     """
     sample = sample.strip()
     if not sample:
+        logger.debug("Empty sample provided to detect_hash_modes")
         return []
+
+    logger.debug(f"Detecting hash type for sample: {sample[:32]}... (length: {len(sample)})")
 
     # Use name-that-hash if available (much better detection)
     if NTH_AVAILABLE:
-        return _detect_with_name_that_hash(sample)
+        results = _detect_with_name_that_hash(sample)
+        if results:
+            logger.info(f"Successfully detected {len(results)} potential hash types")
+        else:
+            logger.warning("No hash types detected by name-that-hash")
+        return results
 
     # Fallback to regex-based detection
-    return _detect_with_regex(sample)
+    logger.debug("Using regex-based detection (name-that-hash not available)")
+    results = _detect_with_regex(sample)
+    if results:
+        logger.info(f"Regex detection found {len(results)} potential hash types")
+    else:
+        logger.warning("No hash types detected by regex fallback")
+    return results
 
 
 def _detect_with_name_that_hash(sample: str) -> List[HashGuess]:
@@ -94,6 +113,7 @@ def _detect_with_name_that_hash(sample: str) -> List[HashGuess]:
         result = nth_runner.api_return_hashes_as_dict([sample], {})
 
         if not result or sample not in result:
+            logger.debug(f"name-that-hash returned no results for sample: {sample[:32]}...")
             return []
 
         matches: List[HashGuess] = []
@@ -124,10 +144,13 @@ def _detect_with_name_that_hash(sample: str) -> List[HashGuess]:
                 reason=reason
             ))
 
+        logger.info(f"name-that-hash detected {len(matches)} hash types for sample")
         return matches
 
-    except Exception:
-        # If name-that-hash fails, fall back to regex
+    except Exception as e:
+        # If name-that-hash fails, log the error and fall back to regex
+        logger.error(f"name-that-hash detection failed: {e}", exc_info=True)
+        logger.info("Falling back to regex-based detection")
         return _detect_with_regex(sample)
 
 
@@ -173,14 +196,19 @@ def sample_from_file(path: str) -> Optional[str]:
     """Grab a representative hash entry from the provided file."""
     file_path = Path(path).expanduser()
     if not file_path.exists():
+        logger.error(f"Hash file not found: {file_path}")
         return None
     try:
+        logger.debug(f"Reading hash sample from: {file_path}")
         with file_path.open("r", encoding="utf-8", errors="ignore") as handle:
-            for line in handle:
+            for line_num, line in enumerate(handle, 1):
                 candidate = _extract_candidate(line)
                 if candidate:
+                    logger.debug(f"Extracted hash sample from line {line_num}: {candidate[:32]}...")
                     return candidate
-    except OSError:
+        logger.warning(f"No valid hash found in file: {file_path}")
+    except OSError as e:
+        logger.error(f"Error reading hash file {file_path}: {e}")
         return None
     return None
 
