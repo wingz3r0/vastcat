@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import List, Optional
+import os
 import shlex
 import shutil
 
@@ -27,10 +28,34 @@ def check_hashcat_with_warning(console: Console) -> bool:
     if shutil.which("hashcat"):
         return True
 
+    # Try automatic installation
     console.print("\n[bold yellow]⚠️  Hashcat is not installed![/bold yellow]")
-    console.print("[dim]Hashcat is required to run password cracking operations.[/dim]")
-    console.print("\n[bold]To install hashcat, run:[/bold]")
-    console.print("  [cyan]vastcat install-hashcat[/cyan]")
+    console.print("[dim]Attempting automatic installation...[/dim]\n")
+
+    try:
+        from .install_hashcat import download_and_install_hashcat
+
+        # Suppress verbose output during automatic installation
+        import io
+        import sys
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+
+        try:
+            success = download_and_install_hashcat(verbose=False)
+        finally:
+            sys.stdout = old_stdout
+
+        if success and shutil.which("hashcat"):
+            console.print("[green]✓ Hashcat installed successfully![/green]\n")
+            return True
+        else:
+            console.print("[yellow]⚠️  Automatic installation failed[/yellow]\n")
+    except Exception as e:
+        console.print(f"[yellow]⚠️  Automatic installation failed: {e}[/yellow]\n")
+
+    console.print("[dim]Please install hashcat manually:[/dim]")
+    console.print("  [cyan]vastcat install-hashcat[/cyan]  (for instructions)")
     console.print("\n[dim]Or install directly:[/dim]")
     console.print("  [dim]Ubuntu/Debian: sudo apt install hashcat[/dim]")
     console.print("  [dim]macOS: brew install hashcat[/dim]\n")
@@ -104,22 +129,41 @@ def doctor() -> None:
     console = Console()
     console.print("\n[bold cyan]VastCat Setup Check[/bold cyan]\n")
 
-    # Check hashcat
-    hashcat_path = shutil.which("hashcat")
-    if hashcat_path:
-        console.print(f"[green]✓[/green] Hashcat found: [dim]{hashcat_path}[/dim]")
+    # Check hashcat - try local installation first
+    local_hashcat = Path.home() / ".local" / "share" / "vastcat" / "hashcat" / "hashcat"
+    local_bin = Path.home() / ".local" / "bin" / "hashcat"
+    system_hashcat = shutil.which("hashcat")
+
+    hashcat_found = False
+    hashcat_path = None
+
+    if local_hashcat.exists() and os.access(local_hashcat, os.X_OK):
+        hashcat_path = str(local_hashcat)
+        hashcat_found = True
+        console.print(f"[green]✓[/green] Hashcat (local): [dim]{hashcat_path}[/dim]")
+    elif local_bin.exists() and os.access(local_bin, os.X_OK):
+        hashcat_path = str(local_bin)
+        hashcat_found = True
+        console.print(f"[green]✓[/green] Hashcat (local): [dim]{hashcat_path}[/dim]")
+    elif system_hashcat:
+        hashcat_path = system_hashcat
+        hashcat_found = True
+        console.print(f"[green]✓[/green] Hashcat (system): [dim]{hashcat_path}[/dim]")
+    else:
+        console.print("[red]✗[/red] Hashcat not found")
+        console.print("  [dim]Try reinstalling: pip install --force-reinstall vastcat[/dim]")
+        console.print("  [dim]Or run: vastcat install-hashcat[/dim]")
+
+    if hashcat_found and hashcat_path:
         # Try to get version
         import subprocess
         try:
-            result = subprocess.run(["hashcat", "--version"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run([hashcat_path, "--version"], capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
                 version = result.stdout.strip().split('\n')[0]
                 console.print(f"  [dim]Version: {version}[/dim]")
         except Exception:
             pass
-    else:
-        console.print("[red]✗[/red] Hashcat not found")
-        console.print("  [dim]Run 'vastcat install-hashcat' for installation instructions[/dim]")
 
     # Check name-that-hash
     try:

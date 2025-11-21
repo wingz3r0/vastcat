@@ -18,7 +18,17 @@ class HashcatRunner:
 
     def _find_hashcat_binary(self) -> str:
         """Find hashcat binary in PATH or common locations."""
-        # First, check if hashcat is in PATH
+        # First, check our local installation (installed by setup.py)
+        local_install = Path.home() / ".local" / "share" / "vastcat" / "hashcat" / "hashcat"
+        if local_install.exists() and os.access(local_install, os.X_OK):
+            return str(local_install)
+
+        # Check ~/.local/bin (symlink location)
+        local_bin = Path.home() / ".local" / "bin" / "hashcat"
+        if local_bin.exists() and os.access(local_bin, os.X_OK):
+            return str(local_bin)
+
+        # Check if hashcat is in PATH
         hashcat_path = shutil.which("hashcat")
         if hashcat_path:
             return hashcat_path
