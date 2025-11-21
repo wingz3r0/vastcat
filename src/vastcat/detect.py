@@ -214,12 +214,40 @@ def sample_from_file(path: str) -> Optional[str]:
 
 
 def _extract_candidate(line: str) -> Optional[str]:
+    """Extract the hash candidate from a line.
+
+    Handles various formats:
+    - Plain hash: 5d41402abc4b2a76b9719d911017c592
+    - user:hash: admin:5d41402abc4b2a76b9719d911017c592
+    - NetNTLMv2: admin::domain:challenge:response:blob (colons are part of format)
+    - bcrypt: $2a$10$... ($ delimiters)
+    """
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
         return None
-    # pick the longest colon-separated field since it usually holds the hash
-    fields = [field.strip() for field in stripped.split(":") if field.strip()]
-    if not fields:
-        return None
-    return max(fields, key=len)
+
+    # Patterns that indicate the whole line should be used (colons are part of format)
+    # NetNTLMv1/v2 pattern: username::domain:challenge:response or similar
+    if "::" in stripped and stripped.count(":") >= 4:
+        return stripped
+
+    # Hashes starting with $ (bcrypt, sha512crypt, etc.) - use whole line
+    if stripped.startswith("$"):
+        return stripped
+
+    # Hash formats with specific patterns that use colons
+    # e.g., sha512crypt: $6$rounds=5000$salt$hash
+    if "$" in stripped:
+        return stripped
+
+    # For simple formats, try colon splitting (user:hash)
+    # but only if there are few colons (1-2 typically)
+    if ":" in stripped and stripped.count(":") <= 2:
+        fields = [field.strip() for field in stripped.split(":") if field.strip()]
+        if fields:
+            # Return the longest field (usually the hash)
+            return max(fields, key=len)
+
+    # Default: return the whole line
+    return stripped
 
